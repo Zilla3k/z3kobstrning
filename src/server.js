@@ -1,10 +1,10 @@
 import fastify from "fastify";
+import userRoutes from "./routes/userRoutes.js";
 
 const server = fastify({logger: true});
 
-server.get('/', (req,res)=>{
-  res.status(200).send({msg: "Hello World"});
-})
+// Define o prefixo na url de https://localhost:3000 -> `/api/users`
+server.register(userRoutes, { prefix: '/api/users' }); // Rotas para os usuarios
 
 const start = async () => {
   try {
