@@ -1,20 +1,17 @@
 import pool from '../database/db.js';
 
-// Create new user
 export const createUser = async ({ name, email, password, role }) => {
-  const [rows] = await pool.query(
+  await pool.query(
     'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
     [name, email, password, role]
   );
 };
 
-// Find user by email
 export const findUserByEmail = async (email) => {
   const [rows] = await pool.query('SELECT email, password_hash, role FROM users WHERE email = ?', [email]);
   return rows.length > 0 ? rows[0] : null; // Retorna o primeiro usuário encontrado ou null se não existir
 };
 
-// Find user by id
 export const findUserById = async (id) => {
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
   return rows.length > 0 ? rows[0] : null;
@@ -48,12 +45,10 @@ export const updateUser = async (id, {name, email} ) => {
   await pool.query(query, params);
 };
 
-// Delete user
 export const deleteUser = async (id) => {
   await pool.query('DELETE FROM users WHERE id = ?', [id]);
 };
 
-// Return all users
 export const getAllUsers = async () => {
   const [rows] = await pool.query('SELECT name, email, role, created_at, updated_at FROM users');
   return rows.length > 0 ? rows : null;

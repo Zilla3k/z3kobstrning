@@ -1,13 +1,11 @@
 import pool from '../database/db.js';
 
-// Return all barbershops
 export const getAllBarbershop = async (role) => {
   const [rows] = await pool.query(
     'SELECT name, address, phone, owner_id FROM barbershops');
   return rows.length > 0 ? rows : null;
 };
 
-// Create barbershop
 export const createBarbershop = async ({ name, address, phone, owner_id }) => {
   const [rows] = await pool.query(
     'INSERT INTO barbershops (name, address, phone, owner_id) VALUES (?, ?, ?, ?)',

@@ -2,13 +2,11 @@ import { getAllUsers, createUser, findUserById, updateUser, deleteUser, findUser
 import { comparePassword, hashPassword } from '../utils/authUtils.js'; 
 import jwt from 'jsonwebtoken';
 
-// Return all users
 export const allUsers = async (req, res) => {
   const users = await getAllUsers();
   res.status(200).send(users);
 };
 
-// Login user
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -28,7 +26,6 @@ export const loginUser = async (req, res) => {
   res.status(200).send({ message: 'Login successful!', token });
 };
 
-// Create new user
 export const registerUser = async (req, res) => {
   const { name, email, password, role = "client" } = req.body;
 
@@ -47,7 +44,6 @@ export const registerUser = async (req, res) => {
   res.status(201).send({ message: 'User created successfully' });
 };
 
-// Found user
 export const getUserProfile = async (req, res) => {
   const { id } = req.params;
   const user = await findUserById(id);
@@ -57,7 +53,6 @@ export const getUserProfile = async (req, res) => {
   res.status(200).send(user);
 };
 
-// Update user
 export const updateUserProfile = async (req, res) => {
   const { id } = req.params;
   const { name, email } = req.body;
@@ -72,7 +67,6 @@ export const updateUserProfile = async (req, res) => {
   res.status(200).send({ message: 'User updated successfully' });
 };
 
-// Delete user
 export const deleteUserProfile = async (req, res) => {
   const { id } = req.params;
   const existingUser = await findUserById(id);
