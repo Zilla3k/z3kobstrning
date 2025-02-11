@@ -7,15 +7,15 @@ import {
 } from '../controllers/barbershopController.js'
 
 const barbershopRoutes = async (fastify, options)=>{
-  fastify.get('/allBarbershops', allBarbershop);
+  fastify.get('/', allBarbershop);
 
-  fastify.post('/createBarbershop', registerBarbershop);
+  fastify.post('/', registerBarbershop);
 
-  fastify.get('/:owner_id', getBarbershopProfile);
+  fastify.get('/:id', getBarbershopProfile);
 
-  fastify.put('/:owner_id', updateBarbershopProfile);
+  fastify.put('/:id', updateBarbershopProfile);
 
-  fastify.delete('/:owner_id', deleteBarbershopProfile);
+  fastify.delete('/:id', deleteBarbershopProfile);
 } 
 
 export default barbershopRoutes;

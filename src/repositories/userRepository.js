@@ -9,12 +9,12 @@ export const createUser = async ({ name, email, password, role }) => {
 
 export const findUserByEmail = async (email) => {
   const [rows] = await pool.query('SELECT email, password_hash, role FROM users WHERE email = ?', [email]);
-  return rows.length > 0 ? rows[0] : null; // Retorna o primeiro usuário encontrado ou null se não existir
+  return rows.length > 0 ? rows[0] : null; 
 };
 
 export const findUserById = async (id) => {
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
-  return rows.length > 0 ? rows[0] : null;
+  return rows.length > 0 ? rows : null;
 };
 
 export const updateUser = async (id, {name, email} ) => {
@@ -50,6 +50,6 @@ export const deleteUser = async (id) => {
 };
 
 export const getAllUsers = async () => {
-  const [rows] = await pool.query('SELECT name, email, role, created_at, updated_at FROM users');
+  const [rows] = await pool.query('SELECT id, name, email, role, created_at, updated_at FROM users');
   return rows.length > 0 ? rows : null;
 }

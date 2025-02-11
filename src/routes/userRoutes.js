@@ -8,9 +8,9 @@ import {
 } from '../controllers/userController.js';
 
 const userRoutes = async (fastify, options) => {
-  fastify.get('/allUsers', allUsers);
+  fastify.get('/', allUsers);
   
-  fastify.post('/createUser', registerUser);
+  fastify.post('/', registerUser);
 
   fastify.post('/login', loginUser);
 
