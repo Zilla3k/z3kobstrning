@@ -2,26 +2,20 @@ import {
   registerAppointments,
   allAppointments,
   userAppointments,
-  barberAppointments,
   userUpdateAppointments,
-  barberUpdateAppointments,
   removeAppointments
 } from "../controllers/appointmentsController.js";
 
 const appointmentsRoutes = async (fastify, options) => {
-  fastify.get('/allAppointments', allAppointments)
+  fastify.get('/', allAppointments)
 
-  fastify.post('/registerAppointments', registerAppointments );
+  fastify.post('/', registerAppointments );
 
-  fastify.get('/user/:id', userAppointments);
-
-  fastify.put('/userUpdate/:id', userUpdateAppointments);
+  fastify.get('/:id', userAppointments);
   
-  fastify.get('/barber/:id', barberAppointments);
+  fastify.put('/:id', userUpdateAppointments);
 
-  fastify.put('/barberUpdate/:id', barberUpdateAppointments);
-
-  fastify.delete('/deleteAppointments/:id', removeAppointments);
+  fastify.delete('/:id', removeAppointments);
 };
 
 export default appointmentsRoutes;

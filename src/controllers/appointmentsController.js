@@ -1,12 +1,9 @@
 import {
   createAppointments,
   getAllAppointments,
-  getBarberAppointments,
   getUserAppointments,
-  putBarberAppointments,
   putUserAppointments,
   deleteAppointments,
-  findAppointmentsByDate
 } from '../repositories/appointmentsRepository.js'
 
 import {
@@ -20,67 +17,67 @@ export const allAppointments = async (req,res) => {
 
 export const registerAppointments = async (req, res) => {
   const { client_id, barber_id, service_id, date_time, status, created_by} = req.body;
-
   await createAppointments(client_id, barber_id, service_id, date_time, status, created_by);
-
   res.status(201).send({message: "Scheduled confirmed!"})
 }
 
 export const userAppointments = async (req, res) => {
   const { id } = req.params;
-  const user = await getUserAppointments(id)
-  res.status(200).send(user)
-}
+  let isClient;
+  const user = await findUserById(id);
+  if(!user){
+    return res.status(404).send({message: 'User not found!'});
+  }
+  if(user[0].role !== 'client'){
+    isClient = false
+    return await getUserAppointments(id, isClient)
+  }
+  isClient = true
+  const result = await getUserAppointments(id, isClient)
 
-export const barberAppointments = async (req, res) => {
-  const { id } = req.params;
-  const barber = await getBarberAppointments(id)
-  res.status(200).send(barber)
+  res.status(200).send(result);
 }
 
 export const userUpdateAppointments = async (req, res) => {
   const { id } = req.params;
-  const { barber_id, service_id, update_time, date_time } = req.body;
+  const { client_id, barber_id, service_id, update_time, date_time } = req.body;
+  let isClient;
 
-  const existingUser = await findUserById(id);
-  if (!existingUser) {
+  const user = await findUserById(id);
+  if (!user) {
     return res.status(404).send({ message: 'User not found!' });
   };
-  
-  await putUserAppointments(id, { barber_id, service_id, update_time ,date_time });
-  
+
+  if(user[0].role !== 'client'){
+    isClient = false
+    await putUserAppointments(id, isClient, { client_id, service_id, update_time ,date_time });
+    res.status(200).send({ message: 'User appointments updated successfully' });
+  }
+  isClient = true
+  const result = await putUserAppointments(id, isClient, { barber_id, service_id, update_time, date_time })
+
+  console.log(result)
+
   res.status(200).send({ message: 'User appointments updated successfully' });
-}
-
-export const barberUpdateAppointments = async (req, res) => {
-  const { id } = req.params;
-  const { client_id, service_id, update_time, date_time } = req.body;
-
-  const existingUser = await findUserById(id);
-  if (!existingUser) {
-    return res.status(404).send({ message: 'User not found!' });
-  };
-  
-  await putBarberAppointments(id, { client_id, service_id, update_time ,date_time });
-  
-  res.status(200).send({ message: 'Barber appointments updated successfully' });
 }
 
 export const removeAppointments = async (req, res) =>{
   const { id } = req.params;
   const { date_time } = req.body;
+  let isClient;
 
-  const existingUser = await findUserById(id);
-  if (!existingUser) {
+  const user = await findUserById(id);
+  if (!user) {
     return res.status(404).send({ message: 'User not found!' });
   };
 
-  const dateFound = await findAppointmentsByDate(date_time)
-  if(!dateFound){
-    return res.status(404).send({message: 'Appointments not found!'})
+  if(user[0].role !== 'client'){
+    isClient = false
+    await deleteAppointments(id, isClient, { date_time });
+    res.status(200).send({message: 'Appointments delete successfully!'})
   }
-
-  await deleteAppointments(id, { date_time });
+  isClient = true
+  await deleteAppointments(id, isClient, { date_time });
 
   res.status(200).send({message: 'Appointments delete successfully!'})
 }
