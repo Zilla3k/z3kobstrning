@@ -7,18 +7,20 @@ import {
   allUsers
 } from '../controllers/userController.js';
 
+import {authenticateAndVerify, authorizeRoles} from '../middleware/authToken.js';
+
 const userRoutes = async (fastify, options) => {
-  fastify.get('/', allUsers);
+  fastify.get('/', { preHandler: [authenticateAndVerify, authorizeRoles(['develp'])]}, allUsers);
   
   fastify.post('/', registerUser);
 
   fastify.post('/login', loginUser);
 
-  fastify.get('/:id', getUserProfile);
+  fastify.get('/:id', { preHandler: authenticateAndVerify}, getUserProfile);
 
-  fastify.put('/:id', updateUserProfile);
+  fastify.put('/:id', { preHandler: authenticateAndVerify}, updateUserProfile);
 
-  fastify.delete('/:id', deleteUserProfile);
+  fastify.delete('/:id', { preHandler: authenticateAndVerify}, deleteUserProfile);
 };
 
 export default userRoutes;
