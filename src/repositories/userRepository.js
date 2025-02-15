@@ -1,14 +1,14 @@
 import pool from '../database/db.js';
 
-export const createUser = async ({ name, email, password, role }) => {
+export const createUser = async ({ name, email, password }) => {
   await pool.query(
-    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-    [name, email, password, role]
+    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, "client")',
+    [name, email, password]
   );
 };
 
 export const findUserByEmail = async (email) => {
-  const [rows] = await pool.query('SELECT email, password_hash, role FROM users WHERE email = ?', [email]);
+  const [rows] = await pool.query('SELECT email, password_hash, role, is_active FROM users WHERE email = ?', [email]);
   return rows.length > 0 ? rows[0] : null; 
 };
 

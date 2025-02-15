@@ -6,16 +6,18 @@ import {
   deleteBarbershopProfile
 } from '../controllers/barbershopController.js'
 
+import { authenticateAndVerify } from '../middleware/authToken.js';
+
 const barbershopRoutes = async (fastify, options)=>{
-  fastify.get('/', allBarbershop);
+  fastify.get('/', { preHandler: authenticateAndVerify}, allBarbershop);
 
-  fastify.post('/', registerBarbershop);
+  fastify.post('/', { preHandler: authenticateAndVerify}, registerBarbershop);
 
-  fastify.get('/:id', getBarbershopProfile);
+  fastify.get('/:id', { preHandler: authenticateAndVerify}, getBarbershopProfile);
 
-  fastify.put('/:id', updateBarbershopProfile);
+  fastify.put('/:id', { preHandler: authenticateAndVerify}, updateBarbershopProfile);
 
-  fastify.delete('/:id', deleteBarbershopProfile);
+  fastify.delete('/:id', { preHandler: authenticateAndVerify}, deleteBarbershopProfile);
 } 
 
 export default barbershopRoutes;
