@@ -1,83 +1,111 @@
-import {
-  createAppointments,
-  getAllAppointments,
-  getUserAppointments,
-  putUserAppointments,
-  deleteAppointments,
-} from '../repositories/appointmentsRepository.js'
+import { repositories } from '../services/repositories.js';
+import { isPrivilegedRole } from '../constants/roles.js';
 
-import {
-  findUserById
-} from '../repositories/userRepository.js'
-
-export const allAppointments = async (req,res) => {
-  const appointments = await getAllAppointments()
-  res.status(200).send(appointments)
-}
-
-export const registerAppointments = async (req, res) => {
-  const { client_id, barber_id, service_id, date_time, status, created_by} = req.body;
-  await createAppointments(client_id, barber_id, service_id, date_time, status, created_by);
-  res.status(201).send({message: "Scheduled confirmed!"})
-}
-
-export const userAppointments = async (req, res) => {
-  const { id } = req.params;
-  let isClient;
-  const user = await findUserById(id);
-  if(!user){
-    return res.status(404).send({message: 'User not found!'});
+const canManageAppointment = (requestUser, appointment) => {
+  if (!requestUser || !appointment) {
+    return false;
   }
-  if(user[0].role !== 'client'){
-    isClient = false
-    return await getUserAppointments(id, isClient)
+
+  if (isPrivilegedRole(requestUser.role)) {
+    return true;
   }
-  isClient = true
-  const result = await getUserAppointments(id, isClient)
 
-  res.status(200).send(result);
-}
+  return Number(appointment.client_id) === Number(requestUser.sub) || Number(appointment.barber_id) === Number(requestUser.sub);
+};
 
-export const userUpdateAppointments = async (req, res) => {
-  const { id } = req.params;
-  const { client_id, barber_id, service_id, update_time, date_time } = req.body;
-  let isClient;
+export const allAppointments = async (request, reply) => {
+  const result = await repositories.appointments.getAllAppointments();
+  return reply.status(200).send(result);
+};
 
-  const user = await findUserById(id);
-  if (!user) {
-    return res.status(404).send({ message: 'User not found!' });
-  };
+export const registerAppointments = async (request, reply) => {
+  const { barber_id, service_id, date_time, status } = request.body ?? {};
 
-  if(user[0].role !== 'client'){
-    isClient = false
-    await putUserAppointments(id, isClient, { client_id, service_id, update_time ,date_time });
-    res.status(200).send({ message: 'User appointments updated successfully' });
+  if (!barber_id || !service_id || !date_time || !status) {
+    return reply.status(400).send({ message: 'Provide all mandatory data!' });
   }
-  isClient = true
-  const result = await putUserAppointments(id, isClient, { barber_id, service_id, update_time, date_time })
 
-  console.log(result)
+  const client_id = request.user.sub;
+  const created_by = request.user.sub;
 
-  res.status(200).send({ message: 'User appointments updated successfully' });
-}
+  await repositories.appointments.createAppointments(client_id, barber_id, service_id, date_time, status, created_by);
+  return reply.status(201).send({ message: 'Scheduled confirmed!' });
+};
 
-export const removeAppointments = async (req, res) =>{
-  const { id } = req.params;
-  const { date_time } = req.body;
-  let isClient;
+export const userAppointments = async (request, reply) => {
+  const { id } = request.params;
+  const appointment = await repositories.appointments.findAppointmentById(id);
 
-  const user = await findUserById(id);
-  if (!user) {
-    return res.status(404).send({ message: 'User not found!' });
-  };
-
-  if(user[0].role !== 'client'){
-    isClient = false
-    await deleteAppointments(id, isClient, { date_time });
-    res.status(200).send({message: 'Appointments delete successfully!'})
+  if (!appointment) {
+    return reply.status(404).send({ message: 'Appointment not found!' });
   }
-  isClient = true
-  await deleteAppointments(id, isClient, { date_time });
 
-  res.status(200).send({message: 'Appointments delete successfully!'})
-}
+  if (!canManageAppointment(request.user, appointment)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  return reply.status(200).send(appointment);
+};
+
+export const userUpdateAppointments = async (request, reply) => {
+  const { id } = request.params;
+  const appointment = await repositories.appointments.findAppointmentById(id);
+
+  if (!appointment) {
+    return reply.status(404).send({ message: 'Appointment not found!' });
+  }
+
+  if (!canManageAppointment(request.user, appointment)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  const { barber_id, service_id, date_time, status } = request.body ?? {};
+  const updateData = {};
+
+  if (barber_id !== undefined) {
+    updateData.barber_id = barber_id;
+  }
+
+  if (service_id !== undefined) {
+    updateData.service_id = service_id;
+  }
+
+  if (date_time !== undefined) {
+    updateData.date_time = date_time;
+  }
+
+  if (status !== undefined) {
+    updateData.status = status;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return reply.status(400).send({ message: 'No fields provided for update' });
+  }
+
+  const result = await repositories.appointments.updateAppointment(id, updateData);
+  if (!result?.affectedRows) {
+    return reply.status(400).send({ message: 'No changes applied' });
+  }
+
+  return reply.status(200).send({ message: 'User appointments updated successfully' });
+};
+
+export const removeAppointments = async (request, reply) => {
+  const { id } = request.params;
+  const appointment = await repositories.appointments.findAppointmentById(id);
+
+  if (!appointment) {
+    return reply.status(404).send({ message: 'Appointment not found!' });
+  }
+
+  if (!canManageAppointment(request.user, appointment)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  const result = await repositories.appointments.deleteAppointment(id);
+  if (!result?.affectedRows) {
+    return reply.status(404).send({ message: 'Appointment not found!' });
+  }
+
+  return reply.status(200).send({ message: 'Appointments delete successfully!' });
+}; 

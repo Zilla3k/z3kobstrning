@@ -1,78 +1,131 @@
-import { getAllUsers, createUser, findUserById, updateUser, deleteUser, findUserByEmail  } from '../repositories/userRepository.js';
-import { comparePassword, hashPassword } from '../utils/authUtils.js'; 
 import jwt from 'jsonwebtoken';
+import { repositories } from '../services/repositories.js';
+import { isPrivilegedRole } from '../constants/roles.js';
 
-export const allUsers = async (req, res) => {
-  const users = await getAllUsers();
-  res.status(200).send(users);
+const canAccessUser = (requestUser, targetUserId) => {
+  if (!requestUser) {
+    return false;
+  }
+
+  if (isPrivilegedRole(requestUser.role)) {
+    return true;
+  }
+
+  return Number(requestUser.sub) === Number(targetUserId);
 };
 
-export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+export const allUsers = async (request, reply) => {
+  const users = await repositories.users.getAllUsers();
+  return reply.status(200).send(users);
+};
+
+export const loginUser = async (request, reply) => {
+  const { email, password } = request.body ?? {};
+
   if (!email || !password) {
-    return res.status(400).send({ message: 'Provide all mandatory data!' });
+    return reply.status(400).send({ message: 'Provide all mandatory data!' });
   }
-  const user = await findUserByEmail(email);
+
+  const user = await repositories.users.findUserByEmailForLogin(email);
   if (!user) {
-    return res.status(401).send({ message: 'Email or password incorrect!' });
+    return reply.status(401).send({ message: 'Email or password incorrect!' });
   }
-  const verifyPassword = await comparePassword(password, user.password_hash);
+
+  const verifyPassword = await repositories.auth.comparePassword(password, user.password_hash);
   if (!verifyPassword) {
-    return res.status(401).send({ message: 'Email or password incorrect!' });
+    return reply.status(401).send({ message: 'Email or password incorrect!' });
   }
-  // Criar o token JWT
-  const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '300s' });
-  
-  res.status(200).send({ message: 'Login successful!', token });
+
+  if (!user.is_active) {
+    return reply.status(403).send({ message: 'Account not verified!' });
+  }
+
+  const accessToken = jwt.sign(
+    {
+      sub: user.id,
+      role: user.role,
+      isActive: Boolean(user.is_active),
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+  );
+
+  return reply.header('Authorization', `Bearer ${accessToken}`).status(200).send({
+    message: 'Login successful!',
+    accessToken,
+  });
 };
 
-export const registerUser = async (req, res) => {
-  const { name, email, password, role = "client" } = req.body;
+export const registerUser = async (request, reply) => {
+  const { name, email, password } = request.body ?? {};
 
   if (!name || !email || !password) {
-    return res.status(400).send({ message: 'Provide all mandatory data!' });
+    return reply.status(400).send({ message: 'Provide all mandatory data!' });
   };
 
-  const existingUser = await findUserByEmail(email);
+  const existingUser = await repositories.users.findUserByEmail(email);
   if (existingUser) {
-    return res.status(400).send({ message: 'User already exists!' });
+    return reply.status(409).send({ message: 'User already exists!' });
   };
 
-  const hashedPassword = await hashPassword(password);
-  await createUser({ name, email, password: hashedPassword, role });
+  const hashedPassword = await repositories.auth.hashPassword(password);
 
-  res.status(201).send({ message: 'User created successfully' });
+  await repositories.users.createUser({ name, email, password: hashedPassword });
+
+  return reply.status(201).send({ message: 'User created successfully' });
 };
 
-export const getUserProfile = async (req, res) => {
-  const { id } = req.params;
-  const user = await findUserById(id);
-  if(!user){
-    res.status(404).send({ message: 'User not found!' });
-  };
-  res.status(200).send(user);
+export const getUserProfile = async (request, reply) => {
+  const { id } = request.params;
+  const user = await repositories.users.findUserById(id);
+
+  if (!user) {
+    return reply.status(404).send({ message: 'User not found!' });
+  }
+
+  if (!canAccessUser(request.user, id)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  return reply.status(200).send(user);
 };
 
-export const updateUserProfile = async (req, res) => {
-  const { id } = req.params;
-  const { name, email } = req.body;
+export const updateUserProfile = async (request, reply) => {
+  const { id } = request.params;
+  const { name, email } = request.body ?? {};
 
-  const existingUser = await findUserById(id);
+  const existingUser = await repositories.users.findUserById(id);
   if (!existingUser) {
-    return res.status(404).send({ message: 'User not found!' });
+    return reply.status(404).send({ message: 'User not found!' });
+  }
+
+  if (!canAccessUser(request.user, id)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  const result = await repositories.users.updateUser(id, { name, email });
+  if (!result?.affectedRows) {
+    return reply.status(400).send({ message: 'No changes applied' });
   };
 
-  await updateUser(id, { name, email });
-
-  res.status(200).send({ message: 'User updated successfully' });
+  return reply.status(200).send({ message: 'User updated successfully' });
 };
 
-export const deleteUserProfile = async (req, res) => {
-  const { id } = req.params;
-  const existingUser = await findUserById(id);
+export const deleteUserProfile = async (request, reply) => {
+  const { id } = request.params;
+  const existingUser = await repositories.users.findUserById(id);
   if (!existingUser) {
-    return res.status(404).send({ message: 'User not found!' });
+    return reply.status(404).send({ message: 'User not found!' });
+  }
+
+  if (!canAccessUser(request.user, id)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
+  const result = await repositories.users.deleteUser(id);
+  if (!result?.affectedRows) {
+    return reply.status(404).send({ message: 'User not found!' });
   };
-  await deleteUser(id);
-  res.status(200).send({ message: 'User deleted successfully!' }); 
+
+  return reply.status(200).send({ message: 'User deleted successfully!' });
 };

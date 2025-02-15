@@ -1,69 +1,104 @@
-import {
-  getAllBarbershop,
-  createBarbershop,
-  findBarbershopByName,
-  updateBarbershop,
-  deleteBarbershop,
-  findOwnerById
-} from '../repositories/barbershopRepository.js'
+import { repositories } from '../services/repositories.js';
+import { isPrivilegedRole } from '../constants/roles.js';
 
-export const allBarbershop = async (req, res) => { 
-  const barbershops = await getAllBarbershop();
-  res.status(200).send(barbershops);
-}; 
+export const allBarbershop = async (request, reply) => {
+  const barbershops = await repositories.barbershops.getAllBarbershop();
+  return reply.status(200).send(barbershops);
+};
 
-export const registerBarbershop = async (req, res) => {
-  const { name, address, phone, owner_id} = req.body;
-  if (!name || !address || !phone || !owner_id) {
-    return res.status(400).send({ message: 'Provide all mandatory data!' });
-  };
-  const existingBarbershop = await findBarbershopByName(name);
+export const registerBarbershop = async (request, reply) => {
+  const { name, address, phone } = request.body ?? {};
+  if (!name || !address || !phone) {
+    return reply.status(400).send({ message: 'Provide all mandatory data!' });
+  }
+
+  const existingBarbershop = await repositories.barbershops.findBarbershopByName(name);
   if (existingBarbershop) {
-    return res.status(400).send({ message: 'Barbershop already exists!' });
-  };
-  await createBarbershop({ name, address, phone, owner_id});
-  res.status(201).send({ message: 'Barbershop created successfully' });
+    return reply.status(409).send({ message: 'Barbershop already exists!' });
+  }
+
+  const owner_id = request.user.sub;
+  await repositories.barbershops.createBarbershop({ name, address, phone, owner_id });
+  return reply.status(201).send({ message: 'Barbershop created successfully' });
 };
 
-export const getBarbershopProfile = async (req, res) => {
-  const { id } = req.params;
-  const user = await findOwnerById(id);
-  if(!user){
-    res.status(404).send({ message: 'Barbershop not found!' });
-  };
-  res.status(200).send(user);
+const canManageBarbershop = (requestUser, barbershop) => {
+  if (!requestUser || !barbershop) {
+    return false;
+  }
+
+  if (isPrivilegedRole(requestUser.role)) {
+    return true;
+  }
+
+  return Number(barbershop.owner_id) === Number(requestUser.sub);
 };
 
-export const updateBarbershopProfile = async (req, res) => {
-  const { id } = req.params;
-  const { name, address, phone } = req.body;
-  const barbershopName = await findBarbershopByName(name);
-  const user = await findOwnerById(id);
-  if(!user || !barbershopName){
-    res.status(404).send({ message: 'Barbershop not found!' });
-  };
+export const getBarbershopProfile = async (request, reply) => {
+  const { id } = request.params;
+  const barbershop = await repositories.barbershops.findBarbershopById(id);
+  if (!barbershop) {
+    return reply.status(404).send({ message: 'Barbershop not found!' });
+  }
+
+  return reply.status(200).send(barbershop);
+};
+
+export const updateBarbershopProfile = async (request, reply) => {
+  const { id } = request.params;
+  const existingBarbershop = await repositories.barbershops.findBarbershopById(id);
+
+  if (!existingBarbershop) {
+    return reply.status(404).send({ message: 'Barbershop not found!' });
+  }
+
+  if (!canManageBarbershop(request.user, existingBarbershop)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
+  }
+
   const updateData = {};
-  if (address !== null) {
+  const { name, address, phone } = request.body ?? {};
+
+  if (name !== undefined) {
+    updateData.name = name;
+  }
+
+  if (address !== undefined) {
     updateData.address = address;
   }
-  if (phone !== null) {
+
+  if (phone !== undefined) {
     updateData.phone = phone;
   }
-  await updateBarbershop(id, name, updateData);
-  res.status(200).send({message: 'Barbershop updated successfully' });
+
+  if (Object.keys(updateData).length === 0) {
+    return reply.status(400).send({ message: 'No fields provided for update' });
+  }
+
+  const result = await repositories.barbershops.updateBarbershop(id, updateData);
+  if (!result?.affectedRows) {
+    return reply.status(400).send({ message: 'No changes applied' });
+  }
+
+  return reply.status(200).send({ message: 'Barbershop updated successfully' });
 };
 
-export const deleteBarbershopProfile = async (req, res) => {
-  const { id } = req.params;
-  const { name } = req.body;
-  const user = await findOwnerById(id);
-  const barbershopName = await findBarbershopByName(name);
-  if (!user || !barbershopName) {
-    return res.status(404).send({ message: 'Barbershop not found!' });
+export const deleteBarbershopProfile = async (request, reply) => {
+  const { id } = request.params;
+  const existingBarbershop = await repositories.barbershops.findBarbershopById(id);
+
+  if (!existingBarbershop) {
+    return reply.status(404).send({ message: 'Barbershop not found!' });
   }
-  if (id != barbershopName.owner_id) {
-    res.status(403).send({ message: 'Operation forbidden!' });
+
+  if (!canManageBarbershop(request.user, existingBarbershop)) {
+    return reply.status(403).send({ message: 'Operation forbidden!' });
   }
-  await deleteBarbershop(id, name);
-  res.status(200).send({ message: 'Barbershop deleted successfully' });
-}; 
+
+  const result = await repositories.barbershops.deleteBarbershop(id);
+  if (!result?.affectedRows) {
+    return reply.status(404).send({ message: 'Barbershop not found!' });
+  }
+
+  return reply.status(200).send({ message: 'Barbershop deleted successfully' });
+};
